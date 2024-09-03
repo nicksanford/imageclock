@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"os"
 	"path"
+	"sync/atomic"
 	"time"
 
 	"go.viam.com/rdk/logging"
@@ -47,7 +48,7 @@ func realMain(ctx context.Context, a []string, logger logging.Logger) error {
 
 	logger.Infof("logging %s images to %s	every %s\n", args.format, args.basepath, args.interval)
 	for utils.SelectContextOrWait(ctx, args.interval) {
-		if err := writeImage(d, args.basepath); err != nil {
+		if err := writeImage(&d, args.basepath); err != nil {
 			return err
 		}
 	}
@@ -102,11 +103,14 @@ func parseArgs(a []string) (args, error) {
 }
 
 type clockDrawer struct {
-	r      image.Rectangle
-	face   font.Face
-	color  color.Color
-	format string
-	big    bool
+	r         image.Rectangle
+	name      string
+	face      font.Face
+	color     color.Color
+	format    string
+	big       bool
+	startTime time.Time
+	count     atomic.Uint64
 }
 
 func newClockDrawer(
@@ -117,6 +121,7 @@ func newClockDrawer(
 	if format != "jpeg" && format != "png" {
 		return clockDrawer{}, fmt.Errorf("unsupported format %s. supported formats: jpeg png", format)
 	}
+
 	multiple := 1
 	if big {
 		if format == "jpeg" {
@@ -143,38 +148,61 @@ func newClockDrawer(
 	}
 
 	return clockDrawer{
-		r:      r,
-		face:   face,
-		color:  color,
-		format: format,
-		big:    big,
+		r:         r,
+		face:      face,
+		color:     color,
+		format:    format,
+		big:       big,
+		startTime: time.Now(),
 	}, nil
 }
 
-func (cd clockDrawer) ext() string {
+func (cd *clockDrawer) ext() string {
 	if cd.format == "jpeg" {
 		return ".jpg"
 	}
 	return ".png"
 }
-func (cd clockDrawer) image(content string) *image.RGBA {
+func (cd *clockDrawer) image(time string) *image.RGBA {
 	// Make a new image with a gray background
 	dst := image.NewRGBA(cd.r)
 
-	// create the drawer
-	d := &font.Drawer{
+	nameDrawer := &font.Drawer{
+		Dst:  dst,
+		Src:  image.NewUniform(cd.color),
+		Face: cd.face,
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 1 * 64)},
+	}
+	nameDrawer.DrawString(cd.name)
+
+	startTimeDrawer := &font.Drawer{
+		Dst:  dst,
+		Src:  image.NewUniform(cd.color),
+		Face: cd.face,
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 2 * 64)},
+	}
+	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d", cd.startTime.Unix()))
+
+	timeDrawer := &font.Drawer{
 		Dst:  dst,
 		Src:  image.NewUniform(cd.color),
 		Face: cd.face,
 		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 3 * 64)},
 	}
+	timeDrawer.DrawString(time)
 
-	d.DrawString(content)
+	countDrawer := &font.Drawer{
+		Dst:  dst,
+		Src:  image.NewUniform(cd.color),
+		Face: cd.face,
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 4 * 64)},
+	}
+	countDrawer.DrawString(fmt.Sprintf("count: %d", cd.count.Add(1)))
 
 	return dst
 }
 
-func writeImage(cd clockDrawer, basepath string) error {
+func writeImage(cd *clockDrawer, basepath string) error {
 	nowStr := time.Now().Format(time.RFC3339Nano)
 	image := cd.image(nowStr)
 
