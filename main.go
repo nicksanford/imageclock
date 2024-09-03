@@ -11,15 +11,10 @@ import (
 	"path"
 	"time"
 
+	"github.com/nicksanford/imageclock/clockdrawer"
+
 	"go.viam.com/rdk/logging"
 	"go.viam.com/utils"
-
-	_ "embed"
-)
-
-var (
-	//go:embed fonts/Aileron-Regular.otf
-	fontBytes []byte
 )
 
 func main() {
@@ -36,7 +31,7 @@ func realMain(ctx context.Context, a []string, logger logging.Logger) error {
 		return fmt.Errorf("failed to create basepath directory: %v", err)
 	}
 
-	d, err := newClockDrawer(args.color, args.format, args.big)
+	d, err := clockdrawer.New(a[0], args.color, args.format, args.big)
 	if err != nil {
 		return err
 	}
@@ -97,18 +92,18 @@ func parseArgs(a []string) (args, error) {
 	}, nil
 }
 
-func writeImage(cd *clockDrawer, basepath string) error {
+func writeImage(cd *clockdrawer.ClockDrawer, basepath string) error {
 	nowStr := time.Now().Format(time.RFC3339Nano)
-	image := cd.image(nowStr)
+	image := cd.Image(nowStr)
 
-	f, err := os.Create(path.Join(basepath, nowStr+cd.ext()))
+	f, err := os.Create(path.Join(basepath, nowStr+cd.Ext()))
 	if err != nil {
 		return fmt.Errorf("failed to create file: %v", err)
 	}
 	defer f.Close()
 
 	b := bufio.NewWriter(f)
-	if cd.format == "jpeg" {
+	if cd.Format == "jpeg" {
 		if err := jpeg.Encode(b, image, &jpeg.Options{Quality: 100}); err != nil {
 			return fmt.Errorf("failed to encode image: %v", err)
 		}

@@ -1,4 +1,4 @@
-package main
+package clockdrawer
 
 import (
 	"fmt"
@@ -19,24 +19,25 @@ var (
 	fontBytes []byte
 )
 
-type clockDrawer struct {
+type ClockDrawer struct {
+	Name      string
+	Format    string
+	Big       bool
+	StartTime time.Time
 	r         image.Rectangle
-	name      string
 	face      font.Face
 	color     color.Color
-	format    string
-	big       bool
-	startTime time.Time
 	count     atomic.Uint64
 }
 
-func newClockDrawer(
+func New(
+	name string,
 	color color.Color,
 	format string,
 	big bool,
-) (clockDrawer, error) {
+) (ClockDrawer, error) {
 	if format != "jpeg" && format != "png" {
-		return clockDrawer{}, fmt.Errorf("unsupported format %s. supported formats: jpeg png", format)
+		return ClockDrawer{}, fmt.Errorf("unsupported format %s. supported formats: jpeg png", format)
 	}
 
 	multiple := 1
@@ -52,7 +53,7 @@ func newClockDrawer(
 	// create the font
 	parsedFont, err := opentype.Parse(fontBytes)
 	if err != nil {
-		return clockDrawer{}, fmt.Errorf("failed to parse font: %v", err)
+		return ClockDrawer{}, fmt.Errorf("failed to parse font: %v", err)
 	}
 
 	face, err := opentype.NewFace(parsedFont, &opentype.FaceOptions{
@@ -61,26 +62,27 @@ func newClockDrawer(
 	})
 
 	if err != nil {
-		return clockDrawer{}, fmt.Errorf("failed to create new face: %v", err)
+		return ClockDrawer{}, fmt.Errorf("failed to create new face: %v", err)
 	}
 
-	return clockDrawer{
+	return ClockDrawer{
 		r:         r,
+		Name:      name,
 		face:      face,
 		color:     color,
-		format:    format,
-		big:       big,
-		startTime: time.Now(),
+		Format:    format,
+		Big:       big,
+		StartTime: time.Now(),
 	}, nil
 }
 
-func (cd *clockDrawer) ext() string {
-	if cd.format == "jpeg" {
+func (cd *ClockDrawer) Ext() string {
+	if cd.Format == "jpeg" {
 		return ".jpg"
 	}
 	return ".png"
 }
-func (cd *clockDrawer) image(time string) *image.RGBA {
+func (cd *ClockDrawer) Image(time string) *image.RGBA {
 	// Make a new image with a gray background
 	dst := image.NewRGBA(cd.r)
 
@@ -90,7 +92,7 @@ func (cd *clockDrawer) image(time string) *image.RGBA {
 		Face: cd.face,
 		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 1 * 64)},
 	}
-	nameDrawer.DrawString(cd.name)
+	nameDrawer.DrawString(cd.Name)
 
 	startTimeDrawer := &font.Drawer{
 		Dst:  dst,
@@ -98,7 +100,7 @@ func (cd *clockDrawer) image(time string) *image.RGBA {
 		Face: cd.face,
 		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 2 * 64)},
 	}
-	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d", cd.startTime.Unix()))
+	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d", cd.StartTime.Unix()))
 
 	timeDrawer := &font.Drawer{
 		Dst:  dst,
