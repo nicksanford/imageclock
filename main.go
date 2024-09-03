@@ -30,17 +30,28 @@ type clockDrawer struct {
 	color    color.Color
 	interval time.Duration
 	format   string
+	big      bool
 }
 
 func main() {
-	if len(os.Args) != 5 {
-		log.Fatalf("usage: %s basepath color interval format", os.Args[0])
+	realMain()
+}
+
+func realMain() {
+	if len(os.Args) != 6 {
+		log.Fatalf("usage: %s basepath color interval format size", os.Args[0])
 	}
 	format := os.Args[4]
 
 	if format != "jpeg" && format != "png" {
 		log.Fatalf("unsupported format %s. supported formats: jpeg png", os.Args[4])
 	}
+
+	size := os.Args[5]
+	if size != "big" && size != "small" {
+		log.Fatalf("size_kb is not a number format %s. supported formats: jpeg png", os.Args[4])
+	}
+	big := size == "big"
 
 	basepath := os.Args[1]
 	var c color.Color
@@ -65,8 +76,9 @@ func main() {
 		log.Fatalf("failed to create basepath directory: %v", err)
 	}
 
-	d := newClockDrawer(basepath, c, interval, format)
+	d := newClockDrawer(basepath, c, interval, format, big)
 
+	log.Printf("logging %s images to %s	every %s\n", format, basepath, interval)
 	for {
 		newImage(d)
 		time.Sleep(d.interval)
@@ -78,15 +90,24 @@ func newClockDrawer(
 	color color.Color,
 	interval time.Duration,
 	format string,
+	big bool,
 ) clockDrawer {
-	r := image.Rect(0, 0, 2560, 1440)
+	multiple := 1
+	if big {
+		if format == "jpeg" {
+			multiple = 4
+		}
+		if format == "png" {
+			multiple = 8
+		}
+	}
+	r := image.Rect(0, 0, 2560*multiple, 1440*multiple)
 	// create the font
 	parsedFont, err := opentype.Parse(fontBytes)
 	if err != nil {
 		log.Fatalf("failed to parse font: %v", err)
 	}
 
-	// create the font face
 	face, err := opentype.NewFace(parsedFont, &opentype.FaceOptions{
 		Size: float64(r.Bounds().Dx() / 30),
 		DPI:  72,
@@ -103,6 +124,7 @@ func newClockDrawer(
 		color:    color,
 		interval: interval,
 		format:   format,
+		big:      big,
 	}
 
 }
@@ -122,8 +144,12 @@ func newImage(cd clockDrawer) {
 	now := time.Now()
 	nowStr := now.Format(time.RFC3339Nano)
 	d.DrawString(nowStr)
+	ext := ".png"
+	if cd.format == "jpeg" {
+		ext = ".jpg"
+	}
 
-	f, err := os.Create(path.Join(cd.basepath, nowStr+".jpg"))
+	f, err := os.Create(path.Join(cd.basepath, nowStr+ext))
 	if err != nil {
 		log.Fatalf("failed to create file: %v", err)
 	}
