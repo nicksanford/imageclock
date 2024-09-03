@@ -100,7 +100,11 @@ func (cd *ClockDrawer) Image(time string) *image.RGBA {
 		Face: cd.face,
 		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 2 * 64)},
 	}
-	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d", cd.StartTime.Unix()))
+	size := "small"
+	if cd.Big {
+		size = "big"
+	}
+	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d, size: %s, image_type: %s", cd.StartTime.Unix(), size, cd.Format))
 
 	timeDrawer := &font.Drawer{
 		Dst:  dst,
