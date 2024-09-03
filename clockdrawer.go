@@ -7,9 +7,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	_ "embed"
+
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
+)
+
+var (
+	//go:embed fonts/Aileron-Regular.otf
+	fontBytes []byte
 )
 
 type clockDrawer struct {
