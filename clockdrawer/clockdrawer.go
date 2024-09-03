@@ -90,7 +90,7 @@ func (cd *ClockDrawer) Image(time string) *image.RGBA {
 		Dst:  dst,
 		Src:  image.NewUniform(cd.color),
 		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 1 * 64)},
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 1 * 64)},
 	}
 	nameDrawer.DrawString(cd.Name)
 
@@ -98,7 +98,7 @@ func (cd *ClockDrawer) Image(time string) *image.RGBA {
 		Dst:  dst,
 		Src:  image.NewUniform(cd.color),
 		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 2 * 64)},
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 2 * 64)},
 	}
 	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d", cd.StartTime.Unix()))
 
@@ -106,7 +106,7 @@ func (cd *ClockDrawer) Image(time string) *image.RGBA {
 		Dst:  dst,
 		Src:  image.NewUniform(cd.color),
 		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 3 * 64)},
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 3 * 64)},
 	}
 	timeDrawer.DrawString(time)
 
@@ -114,7 +114,7 @@ func (cd *ClockDrawer) Image(time string) *image.RGBA {
 		Dst:  dst,
 		Src:  image.NewUniform(cd.color),
 		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 4 * 64)},
+		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 4 * 64)},
 	}
 	countDrawer.DrawString(fmt.Sprintf("count: %d", cd.count.Add(1)))
 

@@ -9,13 +9,20 @@ import (
 	"image/png"
 	"os"
 	"path"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/nicksanford/imageclock/clockdrawer"
+	"golang.org/x/exp/maps"
 
 	"go.viam.com/rdk/logging"
 	"go.viam.com/utils"
 )
+
+func init() {
+	slices.Sort(colorOptions)
+}
 
 func main() {
 	utils.ContextualMain(realMain, logging.NewLogger("imageclock"))
@@ -53,6 +60,15 @@ type args struct {
 	big      bool
 }
 
+var colors = map[string]color.NRGBA{
+	"white": {R: 255, G: 255, B: 255, A: 255},
+	"red":   {R: 255, A: 255},
+	"green": {G: 255, A: 255},
+	"blue":  {B: 255, A: 255},
+}
+
+var colorOptions = maps.Keys(colors)
+
 func parseArgs(a []string) (args, error) {
 	if len(a) != 6 {
 		return args{}, fmt.Errorf("usage: %s basepath color interval format size", a[0])
@@ -60,17 +76,9 @@ func parseArgs(a []string) (args, error) {
 	basepath := a[1]
 
 	var c color.Color
-	switch a[2] {
-	case "white":
-		c = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-	case "red":
-		c = color.NRGBA{R: 255, A: 255}
-	case "green":
-		c = color.NRGBA{G: 255, A: 255}
-	case "blue":
-		c = color.NRGBA{B: 255, A: 255}
-	default:
-		return args{}, fmt.Errorf("unsupported color %s", a[2])
+	c, ok := colors[a[2]]
+	if !ok {
+		return args{}, fmt.Errorf("unsupported color %s, color options: %s", a[2], strings.Join(colorOptions, " "))
 	}
 	interval, err := time.ParseDuration(a[3])
 	if err != nil {
@@ -94,7 +102,7 @@ func parseArgs(a []string) (args, error) {
 
 func writeImage(cd *clockdrawer.ClockDrawer, basepath string) error {
 	nowStr := time.Now().Format(time.RFC3339Nano)
-	image := cd.Image(nowStr)
+	image := cd.Image("time: " + nowStr)
 
 	f, err := os.Create(path.Join(basepath, nowStr+cd.Ext()))
 	if err != nil {
