@@ -7,11 +7,12 @@ all: clockdrawer/fonts/Aileron-Regular.otf
 	GOOS=linux GOARCH=amd64 go build -o bin/linux-amd64/imageclock
 
 clockdrawer/fonts/Aileron-Regular.otf:
-	mkdir -p ./clockdrawer/fonts
-	wget https://www.fontsquirrel.com/fonts/download/aileron -O clockdrawer/fonts/aileron
-	unzip clockdrawer/fonts/aileron -d clockdrawer/fonts
-	rm clockdrawer/fonts/aileron
+	mkdir -p ./clockdrawer/fonts ./clockdrawer/fonts-tmp
+	wget https://www.fontsquirrel.com/fonts/download/aileron -O clockdrawer/fonts-tmp/aileron
+	unzip clockdrawer/fonts-tmp/aileron -d clockdrawer/fonts-tmp
+	cp clockdrawer/fonts-tmp/Aileron-Regular.otf  'clockdrawer/fonts-tmp/CC0 1.0 Universal (CC0 1.0)  Public Domain Dedication.txt' clockdrawer/fonts
+	rm -rf clockdrawer/fonts-tmp
 
 
 fonts-clean:
-	rm -rf clockdrawer/fonts
+	rm -rf clockdrawer/fonts clockdrawer/fonts-tmp
