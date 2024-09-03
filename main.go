@@ -2,15 +2,18 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"image/png"
-	"log"
 	"os"
 	"path"
 	"time"
 
+	"go.viam.com/rdk/logging"
+	"go.viam.com/utils"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
@@ -23,39 +26,50 @@ var (
 	fontBytes []byte
 )
 
-type clockDrawer struct {
-	r        image.Rectangle
+func main() {
+	utils.ContextualMain(realMain, logging.NewLogger("imageclock"))
+}
+
+func realMain(ctx context.Context, a []string, logger logging.Logger) error {
+	args, err := parseArgs(a)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(args.basepath, 0o700); err != nil {
+		return fmt.Errorf("failed to create basepath directory: %v", err)
+	}
+
+	d, err := newClockDrawer(args.color, args.format, args.big)
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("logging %s images to %s	every %s\n", args.format, args.basepath, args.interval)
+	for utils.SelectContextOrWait(ctx, args.interval) {
+		if err := writeImage(d, args.basepath); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type args struct {
 	basepath string
-	face     font.Face
 	color    color.Color
 	interval time.Duration
 	format   string
 	big      bool
 }
 
-func main() {
-	realMain()
-}
-
-func realMain() {
-	if len(os.Args) != 6 {
-		log.Fatalf("usage: %s basepath color interval format size", os.Args[0])
+func parseArgs(a []string) (args, error) {
+	if len(a) != 6 {
+		return args{}, fmt.Errorf("usage: %s basepath color interval format size", a[0])
 	}
-	format := os.Args[4]
+	basepath := a[1]
 
-	if format != "jpeg" && format != "png" {
-		log.Fatalf("unsupported format %s. supported formats: jpeg png", os.Args[4])
-	}
-
-	size := os.Args[5]
-	if size != "big" && size != "small" {
-		log.Fatalf("size_kb is not a number format %s. supported formats: jpeg png", os.Args[4])
-	}
-	big := size == "big"
-
-	basepath := os.Args[1]
 	var c color.Color
-	switch os.Args[2] {
+	switch a[2] {
 	case "white":
 		c = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
 	case "red":
@@ -65,33 +79,44 @@ func realMain() {
 	case "blue":
 		c = color.NRGBA{B: 255, A: 255}
 	default:
-		log.Fatalf("unsupported color %s", os.Args[2])
+		return args{}, fmt.Errorf("unsupported color %s", a[2])
 	}
-	interval, err := time.ParseDuration(os.Args[3])
+	interval, err := time.ParseDuration(a[3])
 	if err != nil {
-		log.Fatalf("invalid interval: %v", err)
+		return args{}, fmt.Errorf("invalid interval: %v", err)
 	}
-
-	if err := os.MkdirAll(basepath, 0o700); err != nil {
-		log.Fatalf("failed to create basepath directory: %v", err)
+	format := a[4]
+	size := a[5]
+	if size != "big" && size != "small" {
+		return args{}, fmt.Errorf("size is one of the supported options %s. supported sizes: big small", a[5])
 	}
+	big := size == "big"
 
-	d := newClockDrawer(basepath, c, interval, format, big)
+	return args{
+		basepath: basepath,
+		color:    c,
+		interval: interval,
+		format:   format,
+		big:      big,
+	}, nil
+}
 
-	log.Printf("logging %s images to %s	every %s\n", format, basepath, interval)
-	for {
-		newImage(d)
-		time.Sleep(d.interval)
-	}
+type clockDrawer struct {
+	r      image.Rectangle
+	face   font.Face
+	color  color.Color
+	format string
+	big    bool
 }
 
 func newClockDrawer(
-	basepath string,
 	color color.Color,
-	interval time.Duration,
 	format string,
 	big bool,
-) clockDrawer {
+) (clockDrawer, error) {
+	if format != "jpeg" && format != "png" {
+		return clockDrawer{}, fmt.Errorf("unsupported format %s. supported formats: jpeg png", format)
+	}
 	multiple := 1
 	if big {
 		if format == "jpeg" {
@@ -105,7 +130,7 @@ func newClockDrawer(
 	// create the font
 	parsedFont, err := opentype.Parse(fontBytes)
 	if err != nil {
-		log.Fatalf("failed to parse font: %v", err)
+		return clockDrawer{}, fmt.Errorf("failed to parse font: %v", err)
 	}
 
 	face, err := opentype.NewFace(parsedFont, &opentype.FaceOptions{
@@ -114,22 +139,25 @@ func newClockDrawer(
 	})
 
 	if err != nil {
-		log.Fatalf("failed to create new face: %v", err)
+		return clockDrawer{}, fmt.Errorf("failed to create new face: %v", err)
 	}
 
 	return clockDrawer{
-		r:        r,
-		basepath: basepath,
-		face:     face,
-		color:    color,
-		interval: interval,
-		format:   format,
-		big:      big,
-	}
-
+		r:      r,
+		face:   face,
+		color:  color,
+		format: format,
+		big:    big,
+	}, nil
 }
 
-func newImage(cd clockDrawer) {
+func (cd clockDrawer) ext() string {
+	if cd.format == "jpeg" {
+		return ".jpg"
+	}
+	return ".png"
+}
+func (cd clockDrawer) image(content string) *image.RGBA {
 	// Make a new image with a gray background
 	dst := image.NewRGBA(cd.r)
 
@@ -141,29 +169,31 @@ func newImage(cd clockDrawer) {
 		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 3 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 3 * 64)},
 	}
 
-	now := time.Now()
-	nowStr := now.Format(time.RFC3339Nano)
-	d.DrawString(nowStr)
-	ext := ".png"
-	if cd.format == "jpeg" {
-		ext = ".jpg"
-	}
+	d.DrawString(content)
 
-	f, err := os.Create(path.Join(cd.basepath, nowStr+ext))
+	return dst
+}
+
+func writeImage(cd clockDrawer, basepath string) error {
+	nowStr := time.Now().Format(time.RFC3339Nano)
+	image := cd.image(nowStr)
+
+	f, err := os.Create(path.Join(basepath, nowStr+cd.ext()))
 	if err != nil {
-		log.Fatalf("failed to create file: %v", err)
+		return fmt.Errorf("failed to create file: %v", err)
 	}
 	defer f.Close()
 
 	b := bufio.NewWriter(f)
 	if cd.format == "jpeg" {
-		if err := jpeg.Encode(b, dst, &jpeg.Options{Quality: 100}); err != nil {
-			log.Fatalf("failed to encode image: %v", err)
+		if err := jpeg.Encode(b, image, &jpeg.Options{Quality: 100}); err != nil {
+			return fmt.Errorf("failed to encode image: %v", err)
 		}
 	} else {
-		if err := png.Encode(b, dst); err != nil {
-			log.Fatalf("failed to encode image: %v", err)
+		if err := png.Encode(b, image); err != nil {
+			return fmt.Errorf("failed to encode image: %v", err)
 		}
-
 	}
+
+	return nil
 }
