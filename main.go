@@ -125,7 +125,7 @@ func newClockDrawer(
 	multiple := 1
 	if big {
 		if format == "jpeg" {
-			multiple = 4
+			multiple = 3
 		}
 		if format == "png" {
 			multiple = 8
