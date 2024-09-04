@@ -9,30 +9,29 @@ import (
 
 	_ "embed"
 
+	"github.com/fogleman/gg"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
-	"golang.org/x/image/math/fixed"
 )
 
-var (
-	//go:embed fonts/Aileron-Regular.otf
-	fontBytes []byte
-)
+//go:embed fonts/Aileron-Regular.otf
+var fontBytes []byte
 
 type ClockDrawer struct {
 	Name      string
 	Format    string
 	Big       bool
 	StartTime time.Time
-	r         image.Rectangle
+	x         int
+	y         int
 	face      font.Face
-	color     color.Color
+	color     color.NRGBA
 	count     atomic.Uint64
 }
 
 func New(
 	name string,
-	color color.Color,
+	color color.NRGBA,
 	format string,
 	big bool,
 ) (ClockDrawer, error) {
@@ -49,15 +48,16 @@ func New(
 			multiple = 8
 		}
 	}
-	r := image.Rect(0, 0, 2560*multiple, 1440*multiple)
-	// create the font
+	x := 2560 * multiple
+	y := 1440 * multiple
+	// create the fonet
 	parsedFont, err := opentype.Parse(fontBytes)
 	if err != nil {
 		return ClockDrawer{}, fmt.Errorf("failed to parse font: %v", err)
 	}
 
 	face, err := opentype.NewFace(parsedFont, &opentype.FaceOptions{
-		Size: float64(r.Bounds().Dx() / 30),
+		Size: float64(x / 30),
 		DPI:  72,
 	})
 
@@ -66,7 +66,8 @@ func New(
 	}
 
 	return ClockDrawer{
-		r:         r,
+		x:         x,
+		y:         y,
 		Name:      name,
 		face:      face,
 		color:     color,
@@ -82,45 +83,40 @@ func (cd *ClockDrawer) Ext() string {
 	}
 	return ".png"
 }
-func (cd *ClockDrawer) Image(time string) *image.RGBA {
-	// Make a new image with a gray background
-	dst := image.NewRGBA(cd.r)
 
-	nameDrawer := &font.Drawer{
-		Dst:  dst,
-		Src:  image.NewUniform(cd.color),
-		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 1 * 64)},
-	}
-	nameDrawer.DrawString(cd.Name)
-
-	startTimeDrawer := &font.Drawer{
-		Dst:  dst,
-		Src:  image.NewUniform(cd.color),
-		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 2 * 64)},
-	}
+func (cd *ClockDrawer) Image(time string) (image.Image, error) {
 	size := "small"
 	if cd.Big {
 		size = "big"
 	}
-	startTimeDrawer.DrawString(fmt.Sprintf("start_time: %d, size: %s, image_type: %s", cd.StartTime.Unix(), size, cd.Format))
 
-	timeDrawer := &font.Drawer{
-		Dst:  dst,
-		Src:  image.NewUniform(cd.color),
-		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 3 * 64)},
+	return NewImage(cd.x, cd.y, cd.color, []string{
+		cd.Name,
+		fmt.Sprintf("start_time: %d, size: %s, image_type: %s", cd.StartTime.Unix(), size, cd.Format),
+		time,
+		fmt.Sprintf("count: %d", cd.count.Add(1)),
+	})
+}
+
+func NewImage(x, y int, col color.NRGBA, lines []string) (image.Image, error) {
+	dc := gg.NewContext(x, y)
+	parsedFont, err := opentype.Parse(fontBytes)
+	if err != nil {
+		return nil, err
 	}
-	timeDrawer.DrawString(time)
-
-	countDrawer := &font.Drawer{
-		Dst:  dst,
-		Src:  image.NewUniform(cd.color),
-		Face: cd.face,
-		Dot:  fixed.Point26_6{X: fixed.Int26_6(dst.Bounds().Dx() / 11 * 64), Y: fixed.Int26_6(dst.Bounds().Dy() / 5 * 4 * 64)},
+	face, err := opentype.NewFace(parsedFont, &opentype.FaceOptions{
+		Size: float64(x / 30),
+		DPI:  72,
+	})
+	if err != nil {
+		return nil, err
 	}
-	countDrawer.DrawString(fmt.Sprintf("count: %d", cd.count.Add(1)))
+	dc.SetFontFace(face)
 
-	return dst
+	dc.SetRGBA255(int(col.R), int(col.G), int(col.B), int(col.A))
+	for i, l := range lines {
+		dc.DrawStringAnchored(l, float64(x/2), (float64(y)/float64(len(lines)+1))*float64(i+1), 0.5, 0.5)
+	}
+
+	return dc.Image(), nil
 }

@@ -3,6 +3,7 @@ module github.com/nicksanford/imageclock
 go 1.21.13
 
 require (
+	github.com/fogleman/gg v1.3.0
 	go.viam.com/rdk v0.39.0
 	go.viam.com/utils v0.1.97
 	golang.org/x/exp v0.0.0-20230725012225-302865e7556b
@@ -21,6 +22,7 @@ require (
 	github.com/edaniels/zeroconf v1.0.10 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

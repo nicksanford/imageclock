@@ -28,7 +28,14 @@ func main() {
 	utils.ContextualMain(realMain, logging.NewLogger("imageclock"))
 }
 
+func run(ctx context.Context, a []string, logger logging.Logger) error {
+	return nil
+}
+
 func realMain(ctx context.Context, a []string, logger logging.Logger) error {
+	if len(a) >= 2 && a[1] == "run" {
+		return run(ctx, a, logger)
+	}
 	args, err := parseArgs(a)
 	if err != nil {
 		return err
@@ -54,7 +61,7 @@ func realMain(ctx context.Context, a []string, logger logging.Logger) error {
 
 type args struct {
 	basepath string
-	color    color.Color
+	color    color.NRGBA
 	interval time.Duration
 	format   string
 	big      bool
@@ -75,7 +82,6 @@ func parseArgs(a []string) (args, error) {
 	}
 	basepath := a[1]
 
-	var c color.Color
 	c, ok := colors[a[2]]
 	if !ok {
 		return args{}, fmt.Errorf("unsupported color %s, color options: %s", a[2], strings.Join(colorOptions, " "))
@@ -102,7 +108,10 @@ func parseArgs(a []string) (args, error) {
 
 func writeImage(cd *clockdrawer.ClockDrawer, basepath string) error {
 	nowStr := time.Now().Format(time.RFC3339Nano)
-	image := cd.Image("time: " + nowStr)
+	image, err := cd.Image("time: " + nowStr)
+	if err != nil {
+		return fmt.Errorf("failed to create image: %v", err)
+	}
 
 	f, err := os.Create(path.Join(basepath, nowStr+cd.Ext()))
 	if err != nil {
