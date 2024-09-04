@@ -42,10 +42,10 @@ func New(
 	multiple := 1
 	if big {
 		if format == "jpeg" {
-			multiple = 3
+			multiple = 4
 		}
 		if format == "png" {
-			multiple = 8
+			multiple = 4
 		}
 	}
 	x := 2560 * multiple
